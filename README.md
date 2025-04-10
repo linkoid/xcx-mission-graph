@@ -1,4 +1,6 @@
-# Xenoblade Chronicles X - Mission Graph
+# Xenoblade Chronicles X - Interactive Mission Graph
+
+![preview](preview.png)
 
 ### Looking for the graph? It's right here: https://linkoid.github.io/xcx-mission-graph/
 
