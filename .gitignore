@@ -1,0 +1,4 @@
+__pycache__
+.venv
+.requests_cache.sqlite
+*.prof
