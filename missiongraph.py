@@ -129,6 +129,11 @@ def build_graph(skip_basic=False):
                     length=190,
                 )
 
+    # Draw edges from leadsto data
+    for mission in missions.values():
+        if mission.leadsto:
+            graph.add_edge(mission.href, mission.leadsto.href, label='leads to', dashes=True)
+
     # Draw edges from required characters
     for mission in missions.values():
         for required in mission.required:

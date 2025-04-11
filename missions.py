@@ -98,13 +98,17 @@ class Mission:
     def difficulty(self):
         value = self._get_data_value('difficulty')
         return value.strip('-').strip() if value else value
-    
+
     @property
     def required(self):
         div = self._get_data_value_div('required')
         if div is None:
             return []
         return [ Hyperlink(a) for a in div.find_all('a') ]
+
+    @property
+    def leadsto(self):
+        return self._get_data_value('leadsto')
 
     @property
     def prereqs(self):
