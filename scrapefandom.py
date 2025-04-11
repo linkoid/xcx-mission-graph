@@ -7,7 +7,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import OrderedDict
 from bs4 import BeautifulSoup
 
-from missions import Mission, Hyperlink, MissionsDAO
+from missions import Mission
 
 base_url = 'https://xenoblade.fandom.com/'
 

@@ -1,30 +1,13 @@
-import sqlite3
+import copy
 import urllib.parse
 import requests
 import requests_cache
 from bs4 import BeautifulSoup, PageElement, SoupStrainer, Tag
+from bs4.builder._lxml import LXMLTreeBuilder
+
 
 _base_url = 'https://xenoblade.fandom.com/'
-
-class Hyperlink:
-    def __init__(self, element):
-        self._element = element
-
-    @property
-    def href(self) -> str:
-        return self._element['href']
-
-    @property
-    def title(self) -> str:
-        return self._element['title']
-
-    @property
-    def string(self) -> str:
-        return self._element.string
-
-    def __repr__(self):
-        return repr(self._element)
-        #return f'<Mission "{self.name}">'
+_builder = LXMLTreeBuilder()
 
 class Mission:
     @staticmethod
@@ -44,26 +27,47 @@ class Mission:
             response = session.get(url, timeout=timeout)
         response.raise_for_status()
         mission_strainer = SoupStrainer('div', class_='xcx mission')
-        soup = BeautifulSoup(response.content, 'lxml', )
+        soup = BeautifulSoup(response.content, builder=_builder)
         return soup.find(mission_strainer)
 
-    def __init__(self, url: str | bytes, *, info_box: str | BeautifulSoup = ...):
+    def __init__(self, url: str | bytes, *, info_box: Tag = ...):
         if info_box is ...:
             info_box = Mission._try_get_infobox(url)
         if info_box is None:
             raise ValueError(f"'info_box' cannot be None and could not be found in '{url}'")
         self._href = urllib.parse.urlparse(url).path
-        self._info_box = BeautifulSoup(str(info_box), 'lxml')
+        self._info_box = copy.deepcopy(info_box)
 
-    def _get_data_value(self, data_source: str):
+    def _get_data_value_div(self, data_source: str):
         tag = self._info_box.find('div', {'data-source': data_source}, class_='pi-data')
         if tag is None:
             return None
         pi_data_value = tag.find('div', class_='pi-data-value')
+        return pi_data_value
+
+    def _get_data_value(self, data_source: str):
+        pi_data_value = self._get_data_value_div(data_source)
         if pi_data_value is None:
             return None
         a = pi_data_value.find('a')
         return Hyperlink(a) if a is not None else str(pi_data_value.get_text().strip())
+
+    def _get_data_value_list(self, data_source: str):
+        div = self._get_data_value_div(data_source)
+        if div is None:
+            return
+        temp_div = None
+        for child in div.contents:
+            if isinstance(child, Tag) and child.name == 'br':
+                if temp_div is not None:
+                    yield temp_div
+                temp_div = None
+                continue
+            if temp_div is None:
+                temp_div = div.copy_self()
+            temp_div.append(copy.deepcopy(child))
+        if temp_div is not None:
+            yield temp_div
 
     @property
     def href(self):
@@ -94,15 +98,39 @@ class Mission:
     def difficulty(self):
         value = self._get_data_value('difficulty')
         return value.strip('-').strip() if value else value
+    
+    @property
+    def required(self):
+        div = self._get_data_value_div('required')
+        if div is None:
+            return []
+        return [ Hyperlink(a) for a in div.find_all('a') ]
 
     @property
     def prereqs(self):
-        div = self._info_box.find('div', {'data-source': 'prereqs'})
-        div = div.find('div') if div is not None else None
-        if div is None:
-            return None
-        return [ Prerequisite(x.strip())
-                 for x in bytes.decode(div.renderContents(encoding='utf8'), encoding='utf8').split('<br/>') ]
+        client = self.client
+        return [ Prerequisite(element, client) for element in self._get_data_value_list('prereqs') ]
+
+    @property
+    def rewards(self):
+        client = self.client
+        return [ Reward(element, client) for element in self._get_data_value_list('rewards') ]
+
+    @property
+    def embed(self):
+        embed = copy.deepcopy(self._info_box)
+        h2 = embed.find('h2', {'data-source': 'name'})
+        BeautifulSoup().new_tag('a')
+        new_a = Tag(name='a', attrs={'href': self.href}, builder=_builder)
+        for content in reversed(h2.contents):
+            new_a.insert(0, content.extract())
+        h2.insert(0, new_a)
+        for a in embed.find_all('a'):
+            a['target'] = '_blank'
+        aside = embed.find('aside', class_='portable-infobox')
+        if aside:
+            aside['style'] = 'margin: 0px'
+        return embed.decode()
 
     def __repr__(self):
         return f"Mission('{self.href}')"
@@ -118,14 +146,98 @@ f"""Mission('{self.href}')
     location: {self.location}
     difficulty: {self.difficulty}
     prereqs: {[str(x) for x in self.prereqs]}
+    rewards: {self.rewards}
 """
 
+class Hyperlink:
+    def __init__(self, element: Tag):
+        self._element = element
+
+    @property
+    def href(self) -> str:
+        return self._element['href']
+
+    @property
+    def title(self) -> str:
+        return self._element['title']
+
+    @property
+    def text(self) -> str:
+        return self._element.text
+
+    @property
+    def string(self) -> str:
+        return self._element.string
+
+    def __repr__(self):
+        return repr(self._element)
+        #return f'<Mission "{self.name}">'
+
 class Prerequisite:
-    def __init__(self, html: str):
-        element: 'Any' = BeautifulSoup(html, 'lxml')
-        self._element: Tag = element
-        if not isinstance(self._element, Tag):
-            self._element = Tag()
+    def __init__(self, element: Tag, client: Hyperlink = None):
+        self._element = element
+        self._client = client
+
+    def _single_a(self):
+        all_a = self._element.find_all('a')
+        if len(all_a) != 1:
+            return None
+        return all_a[0]
+
+    @property
+    def href(self):
+        a = self._single_a()
+        if a and a['title'] != 'Cross':
+            return str(a['href'])
+        if self.is_affinity and self._client and self._client.text in self._element.text:
+            return self._client.href
+        return None
+
+    @property
+    def title(self):
+        a = self._single_a()
+        if a and a['title'] != 'Cross':
+            return str(a['title'])
+        if self.is_affinity and self._client and self._client.text in self._element.text:
+            return self._client.title
+        return None
+
+    @property
+    def text(self):
+        if self.is_affinity:
+            return self._element.text.replace('Cross-', '')
+        return self._element.text
+
+    @property
+    def is_mission(self):
+        a = self._single_a()
+        if a is None:
+            return False
+        return self._element.text == a.text
+
+    @property
+    def is_affinity(self):
+        if '♥' in self._element.text or 'affinity' in self._element.text:
+            return True
+        return False
+
+    @property
+    def embed(self):
+        embed = copy.deepcopy(self._element)
+        for a in embed.find_all('a'):
+            a['target'] = '_blank'
+        return embed.decode()
+
+    def __str__(self):
+        return self.text
+
+    def __repr__(self):
+        return f'Prerequisite(\'{self._element!r}\')'
+
+class Reward:
+    def __init__(self, element: Tag, client: Hyperlink = None):
+        self._element = element
+        self._client = client
 
     def _single_a(self):
         all_a = self._element.find_all('a')
@@ -146,60 +258,30 @@ class Prerequisite:
     @property
     def text(self):
         return self._element.text
-    
+
     @property
-    def is_mission(self):
-        a = self._single_a()
-        if a is None:
-            return False
-        return self._element.text == a.text
+    def unlocks_recruits(self):
+        if 'recruit' in self.text or 'join' in self.text:
+            return True
+        return False
+
+    @property
+    def recruits(self):
+        if not self.unlocks_recruits:
+            return None
+        return [ Hyperlink(a) for a in self._element.find_all('a') ] or [self._client]
+
+    @property
+    def embed(self):
+        embed = copy.deepcopy(self._element)
+        for a in embed.find_all('a'):
+            a['target'] = '_blank'
+        return embed.decode()
 
     def __str__(self):
         return self.text
 
     def __repr__(self):
-        return f'Prerequisite(\'{self._element!r}\')'
+        return f'Reward(\'{self._element!r}\')'
 
-
-class MissionsDAO:
-    def __init__(self):
-        _setup_database()
-        self.connection = sqlite3.connect('missions.sqlite')
-    def __enter__(self):
-        return self
-    def __exit__(self, a, b, c):
-        self.connection.close()
-
-_did_setup = False
-def _setup_database():
-    global _did_setup
-    if _did_setup:
-        return
-    _did_setup = True
-    
-    connection = sqlite3.connect('missions.sqlite')
-    cursor = connection.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS hyperlinks (
-            href VARCHAR(255) PRIMARY KEY,
-            title TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS missions (
-            url VARCHAR(255) PRIMARY KEY,
-            name TEXT,
-            type TEXT,
-            summary TEXT,
-            client VARCHAR(255),
-            location VARCHAR(255),
-            difficulty TEXT,
-            prereqs_text TEXT,
-            
-            FOREIGN KEY (client) REFERENCES hyperlinks(href),
-            FOREIGN KEY (location) REFERENCES hyperlinks(href)
-        )
-    ''')
-
-if __name__ == '__main__':
-    _setup_database()
+HyperlinkLike = Hyperlink | Prerequisite | Reward
