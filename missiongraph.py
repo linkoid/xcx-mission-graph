@@ -84,6 +84,11 @@ def build_graph(skip_basic=False):
                 #level=chapter
             )
 
+    # Draw edges from leadsto data
+    for mission in missions.values():
+        if mission.leadsto:
+            graph.add_edge(mission.href, mission.leadsto.href, label='leads to', dashes=True)
+
     # Draw edges from prerequisites
     for mission in missions.values():
         for prereq in mission.prereqs:
@@ -128,11 +133,6 @@ def build_graph(skip_basic=False):
                     prereq.href, mission.href,
                     length=190,
                 )
-
-    # Draw edges from leadsto data
-    for mission in missions.values():
-        if mission.leadsto:
-            graph.add_edge(mission.href, mission.leadsto.href, label='leads to', dashes=True)
 
     # Draw edges from required characters
     for mission in missions.values():
@@ -196,7 +196,7 @@ def build_graph_network():
     net.options.physics.stabilization.iterations = 500
     net.options.physics.stabilization.updateInterval = 10
     #net.options.physics.stabilization.onlyDynamicEdges = True
-    net.options.physics.stabilization.fit = False
+    #net.options.physics.stabilization.fit = False
 
     node_count = net.num_nodes()
     net.options.__dict__['nodes'] = {
