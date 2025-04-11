@@ -336,6 +336,7 @@ def show_net(net: Network, file='index.html', notebook=False):
         <base href='https://xenoblade.fandom.com/'>
         <link href="/wikia.php?controller=ThemeApi&amp;method=themeVariables" rel="stylesheet">
         <link rel="stylesheet" href="/load.php?lang=en&amp;modules=ext.fandom.ArticleInterlang.css%7Cext.fandom.CreatePage.css%7Cext.fandom.Experiments.TRFC147%7Cext.fandom.GlobalComponents.CommunityHeader.css%7Cext.fandom.GlobalComponents.CommunityHeaderBackground.css%7Cext.fandom.GlobalComponents.CommunityNavigation.css%7Cext.fandom.GlobalComponents.GlobalComponentsTheme.light.css%7Cext.fandom.GlobalComponents.GlobalExploreNavigation.css%7Cext.fandom.GlobalComponents.GlobalFooter.css%7Cext.fandom.GlobalComponents.GlobalNavigationTheme.light.css%7Cext.fandom.GlobalComponents.GlobalTopNavigation.css%7Cext.fandom.GlobalComponents.StickyNavigation.css%7Cext.fandom.HighlightToAction.css%7Cext.fandom.PortableInfoboxFandomDesktop.css%7Cext.fandom.ServerSideExperiments.splitTrafficReleaseNewNav.css%7Cext.fandom.SuggestedPages.css%7Cext.fandom.Thumbnails.css%7Cext.fandom.ThumbnailsViewImage.css%7Cext.fandom.Uncrawlable.css%7Cext.fandom.bannerNotifications.desktop.css%7Cext.fandom.quickBar.css%7Cext.fandomVideo.css%7Cext.staffSig.css%7Cext.visualEditor.desktopArticleTarget.noscript%7Cskin.fandomdesktop.CargoTables-ext.css%7Cskin.fandomdesktop.Math.css%7Cskin.fandomdesktop.font.Lora.css%7Cskin.fandomdesktop.rail.css%7Cskin.fandomdesktop.rail.popularPages.css%7Cskin.fandomdesktop.styles%7Cvendor.tippy.css&amp;only=styles&amp;skin=fandomdesktop">
+        <link rel="stylesheet" href="/load.php?lang=en&amp;modules=site.styles&amp;only=styles&amp;skin=fandomdesktop">
     '''
     # Insert additional header tags
     header_tag = '<meta charset="utf-8">'
@@ -353,7 +354,7 @@ def show_net(net: Network, file='index.html', notebook=False):
     html = html.replace('sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==',
                         'sha512-4/EGWWWj7LIr/e+CvsslZkRk0fHDpf04dydJHoHOH32Mpw8jYU28GNI6mruO7fh/1kq15kSvwhKJftMSlgm0FA==')
 
-    html = html.replace('<html>', '<!DOCTYPE html>')
+    html = '<!DOCTYPE html>\n' + html
 
     with open(file, 'w+', encoding='utf8') as out:
         out.write(html)
