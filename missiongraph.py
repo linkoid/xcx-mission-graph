@@ -202,6 +202,10 @@ def build_graph_network():
     net.options.__dict__['nodes'] = {
         'scaling': {
             'max': node_count,
+            'label': {
+                'enabled': False,
+                'maxVisible': 14,
+            }
             #'customScalingFunction': '''
             #    function (min, max, total, value) {
             #        return min + Math.min(1, value / max);
@@ -251,7 +255,7 @@ def build_graph_network():
                 'max': 6 + node_count / 4,
                 'label': {
                     'enabled': True,
-                    'drawThreshold': 8,
+                    'drawThreshold': 10,
                 },
             }
         },
@@ -262,7 +266,7 @@ def build_graph_network():
                 'max': 8 + node_count / 4,
                 'label': {
                     'enabled': True,
-                    'drawThreshold': 8,
+                    'drawThreshold': 10,
                 },
             }
         },
@@ -306,6 +310,7 @@ def build_graph_network():
             'fixed': { 'x': True }
         },
     }
+    
     return net
 
 def show_net(net: Network, file='index.html', notebook=False):
@@ -341,16 +346,102 @@ def show_net(net: Network, file='index.html', notebook=False):
         <!-- Fix Fandom Icons not Loading -->
         <meta name="referrer" content="no-referrer">
         
+        <!-- Custom Styles -->
+        <style type="text/css">
+        html > body {
+            background-color: black;
+        }
+        html > body > .card {
+            height: 100vh;
+            border: black;
+        }
+        #filter-menu {
+            background-color: black;
+        }
+        div#mynetwork {
+            border-color: black;
+        }
+        div#mynetwork > .popup {
+            padding: 5px;
+            background-color: #040404;
+            border: 4px solid #5594AA;
+            color: white;
+            font-weight: bold;
+        }
+        div#mynetwork > .popup * a {
+            color: #DDF;
+        }
+        div#mynetwork > .popup:has(> .xcx) {
+            border-radius: 15px;
+            border-color: transparent;
+            background-color: transparent;
+        }
+        .popup .xcx .portable-infobox {
+            background-color: #040404;
+        }
+        body > #loadingBar {
+            background-color: rgba(0,0,0,0.8);
+            & .outerBorder {
+                border: 4px solid #5594AA;
+                background: #040404;
+                width: 640px;
+                height: 48px;
+                &::before {
+                    content: 'A';
+                    position: absolute;
+                    display: block;
+                    left: 12px;
+                    top: 6px;
+                    width: 28px;
+                    height: 28px;
+                    text-align: center;
+                    font-weight: bold;
+                    color: #135156;
+                    background-color: white;
+                    border: 2px solid #28A4A4;
+                    border-radius: 20px;
+                }
+            }
+            & #text {
+                color: #6FD0DA;
+                top: 2px;
+                left: 560px;
+                font-weight: bold;
+            }
+            & #bar {
+                background-color: #34ECEC;
+                left: 40px;
+                top: 0px;
+                border-radius: 0px;
+                &::before {
+                    content: '';
+                    position: absolute;
+                    display: block;
+                    left: -2px;
+                    top: -2px;
+                    border-style: solid;
+                    border-color: #040404 transparent transparent #040404;
+                    border-width: 0px 0px 23px 23px;
+                }
+                &::after {
+                    content: '';
+                    position: absolute;
+                    display: block;
+                    right: -2px;
+                    top: -2px;
+                    border-style: solid;
+                    border-color: #040404 transparent #040404 transparent;
+                    border-width: 0px 0px 23px 23px;
+                }
+            }
+        }
+        </style>
+        
     '''
     # Insert additional header tags
     header_tag = '<meta charset="utf-8">'
     head_pos = html.index(header_tag)
     html = html[:head_pos+len(header_tag)] + extra_header + html[head_pos+len(header_tag):]
-
-    # Scale viewport to height of window
-    html = html.replace('<div class="card" style="width: 100%">',
-                        '<div class="card" style="width: 100%; height: 100vh">')
-    #html = html.replace('<body>', '<body style="height: 100%">')
 
     # Update to latest version of vis-network
     html = html.replace('vis-network/9.1.2', 'vis-network/9.1.9')
