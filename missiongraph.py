@@ -61,20 +61,21 @@ def build_graph(skip_basic=False):
         if mission.type.startswith('Basic Mission') and skip_basic:
             continue
         missions[mission.href] = mission
-        mission_type = mission.type.split(' ')[0]
         graph.add_node(
             mission.href,
-            mission_type=mission_type,
+            type=mission.type_enum,
             location=str(mission.location.title),
             client=str(mission.client.title),
-            group=mission_type,
+            name=mission.name,
+            
+            group=mission.type_enum,
             label=mission_title,
             size=get_mission_size(mission),
             #color=get_mission_color(mission),
             #weight=get_mission_weight(mission),
             title=mission.embed,
         )
-        if mission_type == 'Story':
+        if mission.type_enum == 'story':
             chapter = int(mission.name.replace('Chapter ', '')[:2])
             graph.add_node(
                 mission.href,
@@ -91,6 +92,7 @@ def build_graph(skip_basic=False):
 
     # Draw edges from prerequisites
     for mission in missions.values():
+        has_non_chapter_prereqs = False
         for prereq in mission.prereqs:
             if prereq.is_mission and prereq.href not in missions.keys():
                 continue
@@ -105,40 +107,44 @@ def build_graph(skip_basic=False):
                 )
             elif prereq.is_mission:
                 if 'Chapter' in prereq.title:
-                    graph.add_edge(prereq.href, mission.href, weight=0.25)
+                    # This is handled separately below
+                    continue
                 else:
                     graph.add_edge(prereq.href, mission.href)
             elif prereq.href is not None:
-                if prereq.href not in ['/wiki/BLADE_Level', '/wiki/Level_(XCX)', '/wiki/Cross']:
-                    graph.add_edge(
-                        prereq.href, mission.href,
-                        label=simplify_edge_label(prereq),
-                        title=prereq.embed,
-                        dashes=True,
-                    )
-                    graph.add_node(
-                        prereq.href,
-                        label=prereq.title,
-                        title=prereq.embed,
-                        group='Other',
-                        shape='square',
-                        size=6,
-                    )
-
-            # Set special attributes for chapter edges
-            if prereq.title and 'Chapter' in prereq.title and 'Chapter' not in mission.name:
-                chapter = int(prereq.title.replace('Chapter ', '')[:2])
-                #graph.add_node(mission.href, level=chapter)
+                if prereq.href in ['/wiki/BLADE_Level', '/wiki/Level_(XCX)', '/wiki/Cross']:
+                    continue
                 graph.add_edge(
                     prereq.href, mission.href,
-                    length=190,
+                    label=simplify_edge_label(prereq),
+                    title=prereq.embed,
+                    dashes=True,
                 )
+                graph.add_node(
+                    prereq.href,
+                    label=prereq.title,
+                    title=prereq.embed,
+                    group='other',
+                    shape='square',
+                    size=6,
+                )
+            else:
+                continue
+            has_non_chapter_prereqs = True
+        
+        # Set special attributes for chapter edges
+        for prereq in mission.prereqs:
+            if prereq.is_mission and 'Chapter' in prereq.title:
+                chapter = int(prereq.title.replace('Chapter ', '')[:2])
+                graph.add_edge(prereq.href, mission.href,
+                               length=95 if mission.type_enum == 'basic' or has_non_chapter_prereqs else 190,
+                )#physics=False if has_non_chapter_prereqs and mission.type_enum != 'basic' else True)
 
     # Draw edges from required characters
     for mission in missions.values():
         for required in mission.required:
-            graph.add_edge(required.href, mission.href)
-            graph.add_node(required.href, label=required.title, group='Character', shape='square')
+            graph.add_edge(required.href, mission.href, required_character=required.href)
+            graph.add_node(required.href, label=required.title, group='character', shape='square')
 
     # Draw edges from rewards
     for mission in missions.values():
@@ -146,7 +152,7 @@ def build_graph(skip_basic=False):
             if reward.unlocks_recruits:
                 for recruit in reward.recruits:
                     graph.add_edge(mission.href, recruit.href, label=simplify_edge_label(required))
-                    graph.add_node(recruit.href, label=recruit.title, title=reward.embed, group='Character', shape='square')
+                    graph.add_node(recruit.href, label=recruit.title, title=reward.embed, group='character', shape='square')
 
     return graph
 
@@ -162,8 +168,8 @@ def build_graph_network():
     for node_key0, node_key1, data in graph.edges.data():
         if (node_key0, node_key1) in reduced_graph.edges or 'label' in data:
             reduced_graph.add_edge(node_key0, node_key1, **data)
-        #elif 'Chapter' not in node_key0:
-        #    reduced_graph.add_edge(node_key0, node_key1, hidden=True, **data)
+        elif 'Chapter' not in node_key0 and 'required_character' not in data:
+            reduced_graph.add_edge(node_key0, node_key1, **data)
     graph = reduced_graph
 
     # Set node value based on degree
@@ -230,7 +236,7 @@ def build_graph_network():
     }
 
     net.options.__dict__['groups'] = {
-        'Other': {
+        'other': {
             'color': 'blue',
             'shape': 'square',
             'font': {
@@ -245,7 +251,7 @@ def build_graph_network():
                 },
             }
         },
-        'Basic': {
+        'basic': {
             'color': 'blue',
             'font': {
                 'size': 10,
@@ -259,7 +265,7 @@ def build_graph_network():
                 },
             }
         },
-        'Normal': {
+        'normal': {
             'color': 'green',
             'scaling': {
                 'min': 8,
@@ -270,7 +276,7 @@ def build_graph_network():
                 },
             }
         },
-        'Affinity': {
+        'affinity': {
             'color': 'orange',
             'scaling': {
                 'min': 10,
@@ -281,7 +287,7 @@ def build_graph_network():
                 },
             }
         },
-        'Character': {
+        'character': {
             'color': 'orange',
             'shape': 'square',
             'scaling': {
@@ -295,7 +301,7 @@ def build_graph_network():
             'image': 'https://static.wikia.nocookie.net/xenoblade/images/0/06/Anon_NPC_icon.png',
             'brokenImage': 'https://static.wikia.nocookie.net/xenoblade/images/0/06/Anon_NPC_icon.png',
         },
-        'Story': {
+        'story': {
             'color': 'red',
             'shape': 'box',
             'physics': False,
@@ -310,7 +316,6 @@ def build_graph_network():
             'fixed': { 'x': True }
         },
     }
-    
     return net
 
 def show_net(net: Network, file='index.html', notebook=False):

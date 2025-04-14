@@ -83,6 +83,10 @@ class Mission:
         return nav.get_text().strip() if nav else None
 
     @property
+    def type_enum(self):
+        return self.type.split(' ')[0].casefold()
+
+    @property
     def summary(self):
         return self._get_data_value('summary')
 
